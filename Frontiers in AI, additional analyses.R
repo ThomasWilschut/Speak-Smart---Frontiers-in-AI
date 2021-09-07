@@ -49,7 +49,6 @@ dat <- read_excel('full.xlsx')
 
 # convert timestamps to minutes
 
-dat$time <- dat$timestamp/60000
 
 # Set time to zero at the start of each block for each participant
 
@@ -60,6 +59,12 @@ for(i in unique(dat$ppn)) {
     dat[(dat['ppn'] == i & dat['block'] == 'B'), 'time'] <- (dat[(dat['ppn'] == i & dat['block'] == 'B'), 'time'] - individual_block_start_times[[2,1]])
     dat[(dat['ppn'] == i & dat['block'] == 'C'), 'time'] <- (dat[(dat['ppn'] == i & dat['block'] == 'C'), 'time'] - individual_block_start_times[[3,1]])
 } 
+
+# FS: Alternative tidyverse approach:
+# dat <- dat %>% 
+#   group_by(ppn, block) %>% 
+#   mutate(time = time - min(time)) %>% 
+#   ungroup()
 
 
 # select study trials for analysis
