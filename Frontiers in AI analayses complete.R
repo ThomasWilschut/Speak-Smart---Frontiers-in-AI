@@ -5,23 +5,24 @@ options(warn = -1)
  
 ## 1. PACKAGES and FUNCTIONS ##
 
-install.packages('lme4')
-install.packages('haven')
-install.packages('tidyverse')
-install.packages('lmerTest')
-install.packages('readxl')
-install.packages('effects')
-install.packages('ggpubr')
-install.packages('rstatix')
-install.packages('AICcmodavg')
-install.packages("rmarkdown")
-install.packages('plyr', repos = "http://cran.us.r-project.org")
-install.packages('pROC')
-install.packages('patchwork')
-install.packages('psych')
-install.packages('BayesFactor')
-install.packages('reshape2')
-install.packages('ggridges')
+# install.packages('lme4')
+# install.packages('haven')
+# install.packages('tidyverse')
+# install.packages('lmerTest')
+# install.packages('readxl')
+# install.packages('effects')
+# install.packages('ggpubr')
+# install.packages('rstatix')
+# install.packages('AICcmodavg')
+# install.packages("rmarkdown")
+# install.packages('plyr', repos = "http://cran.us.r-project.org")
+# install.packages('pROC')
+# install.packages('patchwork')
+# install.packages('psych')
+# install.packages('BayesFactor')
+# install.packages('reshape2')
+# install.packages('ggridges')
+# install.packages('BBmisc')
 
 # load packages
 
@@ -46,6 +47,7 @@ library('BayesFactor')
 library('psych') # for corr.test()
 library('reshape2')
 library('ggridges')
+library('BBmisc')
 
 
 theme_set(theme_minimal())
@@ -68,15 +70,15 @@ source("slimstampen_model_funs.R")
 ## 2. IMPORTING DATA ##
 
 # set working directory:
-setwd("~/Desktop/frontiersAI")
+# setwd("~/Desktop/frontiersAI")
 
 # import minor thesis slimstampen data: 
 dat <- read_excel('full.xlsx')
-dat$Block <- revalue(dat$block, c("A" = "AT", "B" = "AS", "C" = "FS"))  
-dat$types <- revalue(dat$types, c("study" = "Study", "test" = "Test")) 
+# dat$Block <- revalue(dat$block, c("A" = "AT", "B" = "AS", "C" = "FS"))  ## THIS BREAKS ALL YOUR CODE BELOW!!
+# dat$types <- revalue(dat$types, c("study" = "Study", "test" = "Test")) 
 
 #import magdeburg slimstampen data:
-myfiles <- list.files(path="~/Desktop/frontiersAI", pattern="*.csv", full.names=TRUE)
+myfiles <- list.files(pattern="*.csv", full.names=TRUE)
 datm <- ldply(myfiles, read_csv)
 
 # import memory questionnaire data:
@@ -119,7 +121,7 @@ dat_study <-dat[(dat['types'] == 'study'),]
 dat_study <-dat_study[(dat_study['block'] != 'C'),]     # do not analyse block C
 
 # round time stamps   
-dat_study$time_bins <-round(dat_study$time)
+dat_study$time_bins <-floor(dat_study$time) + 1
 
 hist(dat_study$time)
 # 3.2 Descriptives: differences in RT's between the speaking- and typing conditions 
@@ -151,22 +153,19 @@ dat_study %>%
   filter(rt < 7500) %>% 
   filter(correct == 1) %>%  # only plot correct responses
   mutate(t_min = factor(floor(time) + 1, ordered = TRUE)) %>% 
-  #levels(dat_study$block) <- c("Adaptive Typing", "Adaptive Speaking", "Flashcard Speaking") %>%
-  #filter(block != "Flashcard Speaking") %>%  # we don't care about flashcards here
-  
-  
-  ggplot(aes(rt, t_min, fill = Block)) +
+  mutate(block_lbl = ifelse(block == "A", "AT", "AS")) %>%  # make nicer labels
+  ggplot(aes(rt, t_min, fill = block_lbl)) +
   scale_fill_manual(values=ss_palette) +
   scale_x_discrete(labels = c('Typing','Speaking')) +
   geom_density_ridges(scale = 2, alpha = .6,
                       # maybe adding medians will make the trend easier to see:
                       quantile_lines = TRUE, quantiles = 2) + 
-  scale_y_discrete(expand = c(0, 0)) +     # will generally have to set the `expand` option
-  scale_x_continuous(expand = c(0, 0)) +   # for both axes to remove unneeded padding
-  coord_cartesian(clip = "off") + # to avoid clipping of the very top of the top ridgeline
+  scale_y_discrete(expand = c(0, 0), breaks = 1:12, labels = 1:12) +     # remove the empty bin with 13 minutes at the top of the graph
+  scale_x_continuous(expand = c(0, 0)) +   
+  coord_cartesian(clip = "off") + 
   theme_ridges() +
   NULL +
-  ggtitle("Distribution of reaction times") +  labs(x="RT (ms)", y="Time (minutes)") 
+  ggtitle("Distribution of reaction times") +  labs(x="RT (ms)", y="Time (minutes)", fill = "Block") 
  
   
 
@@ -213,8 +212,7 @@ boxplot_comp + hist_rt
 
 # 3.3. Analysis: which  (typing-based RT or speech-based RT) is a better predictor of performance?
 
-install.packages('BBmisc')
-library('BBmisc')
+
 # ACT-R mapping from activation to RT can be used to compute a predicted activation using
 # the recorded reaction times:
 
@@ -267,12 +265,19 @@ ggplot(dat_study[(dat_study$block != 'C'),], aes(y=correct,x=expected_activation
 
 ## FIGURE 4 ##
 # plot (predicting accuracy from RT-based estimated accuracy (normalized))
-ggplot(dat_study, aes(y=correct,x=exp_act_norm, color = Block)) + 
+acc_offset <- .025
+dat_study %>% 
+  mutate(Block = ifelse(block == "A", "AT", "AS")) %>% 
+  # offset the actual accuracy a bit so the blocks don't overlap:
+  mutate(offset_correct = ifelse(Block == "AT", correct - acc_offset, correct + acc_offset)) %>% 
+  ggplot(aes(y=correct,x=exp_act_norm, color = Block)) + 
   scale_fill_manual(values=ss_palette) +
   scale_color_manual(values=ss_palette) +
-  geom_point(alpha = 0.1, position = position_jitter(height = .05), size = 1) +
+  geom_point(aes(y = offset_correct),
+             alpha = 0.1, position = position_jitter(height = acc_offset), size = 1) +
   stat_smooth(method='glm', method.args=list(family='binomial'),se=TRUE) +
-  ggtitle("Predicting accuracy from reaction times") +  labs(x="Estimated activation", y="Accuracy") +
+  # ggtitle("Predicting accuracy from reaction times") +  
+  labs(x="Estimated activation (normalized)", y="Accuracy") +
   theme_ridges() +
   NULL 
 
@@ -331,8 +336,7 @@ p2 <- ggplot(dat = simulated_data, aes(x = repetition, y = speaking_prediction, 
   geom_point () +
   scale_y_continuous(limits = c(0.5, 1)) +
   ggtitle("Simulated model fit for speaking-based RT's") +  labs(x="Number of item repetitions", y="Predicted accuracy") +
-
-p2 <- p2 + labs(color = "Reaction time (s)")
+  labs(color = "Reaction time (s)")
 
 p1 + p2  # direct comparison on same y-scale
 
@@ -343,6 +347,7 @@ dat_study_A$typing_fit <- predict(typing_norm, newdata=dat_study_A, type = 'resp
 dat_study_B$speaking_fit <- predict(speaking_norm, newdata=dat_study_B, type = 'response', allow.new.levels = TRUE)
 
 # plot ROC for typing
+### These calls to `roc()` crash my R session :O Not sure what's going on here...
 pROC_typing <- roc(dat_study_A$correct,dat_study_A$typing_fit,
                    smoothed = TRUE,
                    # arguments for ci
@@ -511,7 +516,7 @@ options(warn = oldw)
 
 ## 5: redoing the originial UMAP analyses comparing block B and block C:
 
-dat_BC <- dat[(dat$block != 'A'),]  #remove block C
+dat_BC <- dat[(dat$block != 'A'),]  #remove block A
 
 correct <- glmer(correct ~ block + types + ((1 | ppn) + (1 | fact_id)), data = dat_BC, family = 'binomial')
 summary(correct)
@@ -521,24 +526,31 @@ summary (rt)
   
 ## FIGURE 5 ##
 
-pd <- position_dodge(0.2) # move them .05 to the left and right
+pd <- position_dodge(0.4) # move them .05 to the left and right
 
 ss_palette <- c("#40587C","#CA5010")
 
-RT <- ggplot(dat_BC, aes(x=Block, y=rt, color = as.factor(types))) + geom_point(stat="summary", fun.y="mean", position = pd) + 
-  scale_color_manual(values=ss_palette) +  
-  geom_errorbar(stat="summary", fun.data="mean_se", fun.args = list(mult = 1.96), position = pd) + 
-  ggtitle("Reaction times") +  labs(x="Learning type", y="Average RT (ms)") +
-  theme_ridges() +
-  NULL 
-  
-correct <- ggplot(dat_BC, aes(x=Block, y=correct, color = as.factor(types))) + geom_point(stat="summary", fun.y="mean", position = pd) + 
+RT <- dat_BC %>% 
+  mutate(Block = ifelse(block == "B", "AS", "FS")) %>% 
+  ggplot(aes(x=Block, y=rt, color = as.factor(types))) + 
+  geom_line(stat="summary", fun.y="median", position = pd, alpha = 3/4, aes(group = types)) +
   scale_color_manual(values=ss_palette) +
-  geom_errorbar(stat="summary", fun.data="mean_se", fun.args = list(mult = 1.96), position = pd) +
-  ggtitle("Correctness") +  labs(x="Learning type", y="Correctness (%)") +
+  geom_errorbar(stat="summary", fun.data="mean_se", fun.args = list(mult = 1.96), position = pd, width = .2) +
+  geom_point(stat="summary", fun.y="mean", position = pd, size = 2.8) +
+  ggtitle("Reaction times") +  labs(x=NULL, y="Average RT (ms)") +
   theme_ridges() +
-  theme(legend.position="none") 
+  NULL
 
+correct <- dat_BC %>% 
+  mutate(Block = ifelse(block == "B", "AS", "FS")) %>% 
+  ggplot(aes(x=Block, y=correct, color = as.factor(types))) + 
+  geom_line(stat="summary", fun.y="median", position = pd, alpha = 3/4, aes(group = types)) +
+  scale_color_manual(values=ss_palette) +
+  geom_errorbar(stat="summary", fun.data="mean_se", fun.args = list(mult = 1.96), position = pd, width = .2) +
+  geom_point(stat="summary", fun.y="mean", position = pd, size = 2.8) +
+  ggtitle("Correctness") +  labs(x=NULL, y="Correctness (%)") +
+  theme_ridges() +
+  theme(legend.position="none")
 
 correct +  RT + labs(color = "Session type")
 
