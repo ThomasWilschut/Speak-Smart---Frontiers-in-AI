@@ -1,4 +1,4 @@
-### Frontiers in AI - Additional Analysis script SPEAK SMART ###
+### Frontiers - Additional Analysis script SPEAK SMART ###
 
 oldw <- getOption("warn")
 options(warn = -1)
@@ -49,11 +49,14 @@ library('reshape2')
 library('ggridges')
 library('BBmisc')
 
-
+# set theme for plots:
 theme_set(theme_minimal())
 
+# color palettes:
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+cbPalette2 <- c("#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
-# function to compute model fit
+# function to compute model fit:
 
 r2.corr.mer <- function(m) {
   lmfit <-  lm(model.response(model.frame(m)) ~ fitted(m))
@@ -66,16 +69,10 @@ source("cor_heatmap_BF.R")
 # import slimstampen functions (make sure they are stored in the same wd):
 source("slimstampen_model_funs.R")
 
-
-## 2. IMPORTING DATA ##
-
-# set working directory:
-# setwd("~/Desktop/frontiersAI")
+## 2. IMPORTING DATA  ##
 
 # import minor thesis slimstampen data: 
 dat <- read_excel('full.xlsx')
-# dat$Block <- revalue(dat$block, c("A" = "AT", "B" = "AS", "C" = "FS"))  ## THIS BREAKS ALL YOUR CODE BELOW!!
-# dat$types <- revalue(dat$types, c("study" = "Study", "test" = "Test")) 
 
 #import magdeburg slimstampen data:
 myfiles <- list.files(pattern="*.csv", full.names=TRUE)
@@ -101,7 +98,6 @@ for(i in unique(dat$ppn)) {
 }
 
 # compute fact repetitions:
-
 df_total = NULL
 
 for(i in unique(dat$ppn)) {
@@ -122,8 +118,8 @@ dat_study <-dat_study[(dat_study['block'] != 'C'),]     # do not analyse block C
 
 # round time stamps   
 dat_study$time_bins <-floor(dat_study$time) + 1
-
 hist(dat_study$time)
+
 # 3.2 Descriptives: differences in RT's between the speaking- and typing conditions 
 # (NB. ss typing = A; SS speaking = B; flashcard speaking = C)
 
@@ -143,19 +139,16 @@ hist_rt <- ggplot(data = dat_study, aes(x=rt, color = block)) +
   ggtitle("Distribution of reaction times") +  labs(x="RT (ms)", y="Count")
 hist_rt
 
-# plots of RT distributions in time bins 
-
+# plots of RT distributions in time bins: 
 
 ## FIGURE 3 ##
-ss_palette <- c("#A4262C", "#038387")
-
 dat_study %>% 
-  filter(rt < 7500) %>% 
+  filter(rt < 6000) %>% 
   filter(correct == 1) %>%  # only plot correct responses
   mutate(t_min = factor(floor(time) + 1, ordered = TRUE)) %>% 
   mutate(block_lbl = ifelse(block == "A", "AT", "AS")) %>%  # make nicer labels
   ggplot(aes(rt, t_min, fill = block_lbl)) +
-  scale_fill_manual(values=ss_palette) +
+  scale_fill_manual(values=cbPalette) +
   scale_x_discrete(labels = c('Typing','Speaking')) +
   geom_density_ridges(scale = 2, alpha = .6,
                       # maybe adding medians will make the trend easier to see:
@@ -165,10 +158,31 @@ dat_study %>%
   coord_cartesian(clip = "off") + 
   theme_ridges() +
   NULL +
-  ggtitle("Distribution of reaction times") +  labs(x="RT (ms)", y="Time (minutes)", fill = "Block") 
- 
-  
+  ggtitle("") + labs(x="RT (ms)", y="Time (minutes)", fill = "Block")
 
+ggsave("fig3.pdf", width = 10, height = 5, path = "~/Desktop/plots" )
+
+
+# parse the data:
+dat_study_A <-dat_study[(dat_study$block == 'A'),]     # ss typing
+dat_study_B <-dat_study[(dat_study$block == 'B'),]     # ss speaking
+dat_study_C <-dat_study[(dat_study$block == 'C'),]     # flashcard speaking 
+
+# calculate the number of items in the filtered dataset:
+nrow(dat_study_A)
+nrow(dat_study_B)
+nrow(dat_study_A %>% 
+       filter(rt < 6000))
+nrow(dat_study_B %>% 
+       filter(rt < 6000))
+
+# In block A:
+2151-2027           # 124 trials were removed...
+(1-2027/2152)*100   # ... which is 5.4%
+
+#In block B:
+2685-2667               # 18 trials removed
+(1 - (2667/2685))*100   # Which is 0.7 percent 
 
 # Correlations 
 
@@ -179,7 +193,6 @@ ggplot(data = dat_study) + stat_summary(
   fun.y = median
 )
 
-
 # make a scatter plot:
 aggregate(rt ~ ppn + block, data = dat_study, FUN = median, na.rm = TRUE) %>% 
   pivot_wider(names_from = block, values_from = rt) %>% 
@@ -189,11 +202,6 @@ aggregate(rt ~ ppn + block, data = dat_study, FUN = median, na.rm = TRUE) %>%
   geom_smooth(method = "lm", se = FALSE) +
   coord_fixed() +
   ggtitle("Correlation plot") +  labs(x="Typing RT", y="Speaking RT")
-
-# further parse data:
-dat_study_A <-dat_study[(dat_study$block == 'A'),]     # ss typing
-dat_study_C <-dat_study[(dat_study$block == 'C'),]     # flashcard speaking 
-dat_study_B <-dat_study[(dat_study$block == 'B'),]     # ss speaking
 
 rt_type = aggregate(dat_study_A$rt, list(dat_study_A$ppn), FUN=mean, na.rm = TRUE)
 rt_speak = aggregate(dat_study_B$rt, list(dat_study_B$ppn), FUN=mean, na.rm = TRUE)
@@ -207,11 +215,10 @@ boxplot_comp <- ggplot(dat_study, aes(x= factor(time_bins), y=rt, fill=block)) +
   geom_boxplot(outlier.colour = NA) +
   ggtitle("Distribution RT over time") +  labs(x="Time (min)", y="RT (ms)")
 
-# Show all RT graphics in a single plot:
+# Show RT graphics in a single plot:
 boxplot_comp + hist_rt
 
 # 3.3. Analysis: which  (typing-based RT or speech-based RT) is a better predictor of performance?
-
 
 # ACT-R mapping from activation to RT can be used to compute a predicted activation using
 # the recorded reaction times:
@@ -219,7 +226,6 @@ boxplot_comp + hist_rt
 dat_study$rt = dat_study$rt/1000  # rt to seconds
 dat_study$expected_activation_from_rt = -log(dat_study$rt-0.3) # compute predicted activation based on RT
 dat_study$expected_accuracy_from_rt = 1/(1+exp(((-0.8 - dat_study$expected_activation_from_rt)/0.1)))  # compute predicted accuracy based on prdicted RT
-
 
 dat_study$exp_act_norm = normalize(dat_study$expected_activation_from_rt)
 
@@ -271,15 +277,18 @@ dat_study %>%
   # offset the actual accuracy a bit so the blocks don't overlap:
   mutate(offset_correct = ifelse(Block == "AT", correct - acc_offset, correct + acc_offset)) %>% 
   ggplot(aes(y=correct,x=exp_act_norm, color = Block)) + 
-  scale_fill_manual(values=ss_palette) +
-  scale_color_manual(values=ss_palette) +
+  scale_fill_manual(values=cbPalette) +
+  scale_color_manual(values=cbPalette) +
   geom_point(aes(y = offset_correct),
              alpha = 0.1, position = position_jitter(height = acc_offset), size = 1) +
   stat_smooth(method='glm', method.args=list(family='binomial'),se=TRUE) +
-  # ggtitle("Predicting accuracy from reaction times") +  
+  #ggtitle("Predicting accuracy from reaction times") +  
   labs(x="Estimated activation (normalized)", y="Accuracy") +
   theme_ridges() +
   NULL 
+
+ggsave("fig4.pdf", width = 6, height = 5, path = "~/Desktop/plots" )
+
 
 # 3.3.2 also add trial number or repetition to the analysis:
 
@@ -422,7 +431,7 @@ for (participant in participants) {
 # alpha summaries:
 summary <- aggregate(rofs[,3], list(rofs$ppn), mean)
 mem$RoF <- summary$x
-correlations <- select(mem, CeradDistance, Age, MOCA, RoF)
+correlations <- select(mem, CeradDistance, MOCA, RoF)
 cor_heatmap_BF(correlations)
 
 
@@ -473,6 +482,7 @@ summary(magdeburg_cerad_int_norm)
 
 
 anova(magdeburg, magdeburg_moca, magdeburg_cerad, magdeburg_cerad_int, magdeburg_moca_int)
+
 # the CERAD-distance interaction model is the best model!
 
 # simulate some data to check model fits:
@@ -483,16 +493,19 @@ simulated_data$exp_act_norm <- normalize(simulated_data$expected_activation_from
 simulated_data$prediction_norm <- predict(magdeburg_cerad_int_norm, newdata=simulated_data, type = 'response', re.form = NA)
 
 ## FIGURE 6 ##
-
 # plot cerad distance:
 p1 <- ggplot(dat = simulated_data, aes(x = CERADd, y = prediction_norm, color = factor(rt))) + 
   #theme(legend.position="none") +
-  geom_line() +
+  geom_line(size=1) +
   geom_point () +
+  scale_color_manual(values=cbPalette2) +
   scale_y_continuous(limits = c(0.4, 1)) +
-  ggtitle("Simulated model fit") +  labs(x="CERAD distance", y="Predicted accuracy")
-
+  ggtitle("") +  labs(x="CERAD distance", y="Predicted accuracy") +
+  theme_ridges() 
 p1 + labs(color = "Reaction time (s)")
+
+ggsave("fig6.pdf", width = 8, height = 5, path = "~/Desktop/plots" )
+
 
 # plot MOCA:
 simulated_data <- crossing(rt = c(0.5, 1.5, 3, 4.5), MOCA = c(20,22,24,26,28,30))
@@ -512,10 +525,7 @@ p1 <- p1 + labs(color = "Reaction time (s)")
 p1 + theme_ridges()
 options(warn = oldw)
 
-
-
 ## 5: redoing the originial UMAP analyses comparing block B and block C:
-
 dat_BC <- dat[(dat$block != 'A'),]  #remove block A
 
 correct <- glmer(correct ~ block + types + ((1 | ppn) + (1 | fact_id)), data = dat_BC, family = 'binomial')
@@ -525,33 +535,33 @@ rt <- lmer(rt ~ block + types + ((1 | ppn) + (1 | fact_id)), data = dat_BC)
 summary (rt)
   
 ## FIGURE 5 ##
-
 pd <- position_dodge(0.4) # move them .05 to the left and right
-
-ss_palette <- c("#40587C","#CA5010")
 
 RT <- dat_BC %>% 
   mutate(Block = ifelse(block == "B", "AS", "FS")) %>% 
   ggplot(aes(x=Block, y=rt, color = as.factor(types))) + 
-  geom_line(stat="summary", fun.y="median", position = pd, alpha = 3/4, aes(group = types)) +
-  scale_color_manual(values=ss_palette) +
-  geom_errorbar(stat="summary", fun.data="mean_se", fun.args = list(mult = 1.96), position = pd, width = .2) +
+  geom_line(stat="summary", fun.y="median", position = pd, alpha = 3/4, aes(group = types), size =1) +
+  scale_color_manual(values=cbPalette2) +
+  geom_errorbar(stat="summary", fun.data="mean_se", fun.args = list(mult = 1.96), position = pd, width = .2, size =1) +
   geom_point(stat="summary", fun.y="median", position = pd, size = 2.8) +
-  ggtitle("Reaction times") +  labs(x=NULL, y="Average RT (ms)") +
+  ggtitle("") +  labs(x=NULL, y="Median RT (ms)") +
   theme_ridges() +
   NULL
 
 correct <- dat_BC %>% 
   mutate(Block = ifelse(block == "B", "AS", "FS")) %>% 
   ggplot(aes(x=Block, y=correct, color = as.factor(types))) + 
-  geom_line(stat="summary", fun.y="mean", position = pd, alpha = 3/4, aes(group = types)) +
-  scale_color_manual(values=ss_palette) +
-  geom_errorbar(stat="summary", fun.data="mean_se", fun.args = list(mult = 1.96), position = pd, width = .2) +
+  geom_line(stat="summary", fun.y="mean", position = pd, alpha = 3/4, aes(group = types), size =1) +
+  scale_color_manual(values=cbPalette2) +
+  geom_errorbar(stat="summary", fun.data="mean_se", fun.args = list(mult = 1.96), position = pd, width = .2, size =1) +
   geom_point(stat="summary", fun.y="mean", position = pd, size = 2.8) +
-  ggtitle("Correctness") +  labs(x=NULL, y="Correctness (%)") +
+  ggtitle("") +  labs(x=NULL, y="Correctness (%)") +
   theme_ridges() +
   theme(legend.position="none")
 
 correct +  RT + labs(color = "Session type")
+
+ggsave("fig5.pdf", width = 10, height = 5, path = "~/Desktop/plots" )
+
 
 
