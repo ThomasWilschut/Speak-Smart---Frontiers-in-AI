@@ -536,7 +536,7 @@ RT <- dat_BC %>%
   geom_line(stat="summary", fun.y="median", position = pd, alpha = 3/4, aes(group = types)) +
   scale_color_manual(values=ss_palette) +
   geom_errorbar(stat="summary", fun.data="mean_se", fun.args = list(mult = 1.96), position = pd, width = .2) +
-  geom_point(stat="summary", fun.y="mean", position = pd, size = 2.8) +
+  geom_point(stat="summary", fun.y="median", position = pd, size = 2.8) +
   ggtitle("Reaction times") +  labs(x=NULL, y="Average RT (ms)") +
   theme_ridges() +
   NULL
@@ -544,7 +544,7 @@ RT <- dat_BC %>%
 correct <- dat_BC %>% 
   mutate(Block = ifelse(block == "B", "AS", "FS")) %>% 
   ggplot(aes(x=Block, y=correct, color = as.factor(types))) + 
-  geom_line(stat="summary", fun.y="median", position = pd, alpha = 3/4, aes(group = types)) +
+  geom_line(stat="summary", fun.y="mean", position = pd, alpha = 3/4, aes(group = types)) +
   scale_color_manual(values=ss_palette) +
   geom_errorbar(stat="summary", fun.data="mean_se", fun.args = list(mult = 1.96), position = pd, width = .2) +
   geom_point(stat="summary", fun.y="mean", position = pd, size = 2.8) +
