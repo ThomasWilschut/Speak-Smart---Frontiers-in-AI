@@ -276,17 +276,17 @@ dat_study %>%
   mutate(Block = ifelse(block == "A", "AT", "AS")) %>% 
   # offset the actual accuracy a bit so the blocks don't overlap:
   mutate(offset_correct = ifelse(Block == "AT", correct - acc_offset, correct + acc_offset)) %>% 
-  ggplot(aes(y=correct,x=exp_act_norm, color = Block)) + 
+  ggplot(aes(y=correct,x=normalize(expected_activation_from_rt), color = Block)) + 
   scale_fill_manual(values=cbPalette) +
   scale_color_manual(values=cbPalette) +
   geom_point(aes(y = offset_correct),
              alpha = 0.1, position = position_jitter(height = acc_offset), size = 1) +
   stat_smooth(method='glm', method.args=list(family='binomial'),se=TRUE) +
   #ggtitle("Predicting accuracy from reaction times") +  
-  labs(x="Estimated activation (normalized)", y="Accuracy") +
+  labs(x="Estimated activation (normalized)", y="Accuracy") + 
   theme_ridges() +
+  scale_x_continuous(name = "Estimated activation (normalized)", sec.axis = sec_axis(~ exp(-(.) + 0.3) , name = 'RT(s)', breaks = c(12,6,3,1.5,0.8,0.4,0.2,0.1))) +
   NULL 
-
 ggsave("fig4.pdf", width = 6, height = 5, path = "~/Desktop/plots" )
 
 
@@ -564,4 +564,20 @@ correct +  RT + labs(color = "Session type")
 ggsave("fig5.pdf", width = 10, height = 5, path = "~/Desktop/plots" )
 
 
+## Supplementart figure on RT distributions ##
+dat_study %>% 
+  filter(correct != 'NA') %>%  # only plot correct responses
+  mutate(block_lbl = ifelse(block == "A", "AT", "AS")) %>%  # make nicer labels
+  ggplot(aes(rt, block_lbl, fill = as.factor(correct))) +
+  scale_fill_manual(values=cbPalette2) +
+  scale_x_discrete(labels = c('Typing','Speaking')) +
+  geom_density_ridges(scale = 0.9, alpha = .6,
+                      # maybe adding medians will make the trend easier to see:
+                      quantile_lines = TRUE, quantiles = 2) + 
+  scale_x_continuous(expand = c(0, 0)) +   
+  coord_cartesian(clip = "off") + 
+  theme_ridges() +
+  NULL +
+  ggtitle("") + labs(x="RT (s)", y="Block", fill = "Correct")
+ggsave("fig_supp.pdf", width = 10, height = 5, path = "~/Desktop/plots" )
 
